@@ -210,7 +210,7 @@
     <!-- Scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, query, orderBy, doc, getDoc, updateDoc, increment, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAZmSTHnXQBHllQ8_dGI72Li4EC775TldI",
@@ -223,6 +223,38 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+
+        // Track Visitors Logic (Runs once per session)
+        async function trackVisitor() {
+            if (!sessionStorage.getItem('visited_arhub')) {
+                try {
+                    const statsRef = doc(db, "stats", "general");
+                    const snap = await getDoc(statsRef);
+                    if(snap.exists()) {
+                        await updateDoc(statsRef, { visitors: increment(1) });
+                    } else {
+                        await setDoc(statsRef, { visitors: 1, total_downloads: 0 });
+                    }
+                    sessionStorage.setItem('visited_arhub', 'true');
+                } catch(e) { console.error("Error tracking visitor", e); }
+            }
+        }
+        trackVisitor();
+
+        // Track Downloads Logic (Called on button click)
+        window.processDownload = async (appId, url) => {
+            // Open URL immediately so user doesn't wait
+            window.open(url, '_blank');
+            
+            try {
+                // Increment specific app download
+                await updateDoc(doc(db, "apps", appId), { downloads: increment(1) });
+                
+                // Increment global downloads
+                const statsRef = doc(db, "stats", "general");
+                await updateDoc(statsRef, { total_downloads: increment(1) });
+            } catch(e) { console.error("Error tracking download", e); }
+        };
 
         // Drawer Logic
         window.toggleDrawer = () => {
@@ -280,18 +312,20 @@
                     snapApps.forEach(doc => {
                         const d = doc.data();
                         const iconUrl = d.icon || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(d.name) + '&background=006874&color=fff&size=128';
+                        const appId = doc.id;
                         
                         appsBox.innerHTML += `
                             <div class="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm card-hover flex flex-col items-center text-center">
                                 <div class="mb-6">
                                     <img src="${iconUrl}" alt="${d.name}" class="app-icon-img" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(d.name)}&background=006874&color=fff&size=128'">
                                 </div>
-                                <h3 class="text-xl font-black text-gray-900 mb-3">${d.name}</h3>
-                                <p class="text-gray-400 text-sm leading-relaxed mb-8">تطبيق حصري وآمن، متاح الآن للتحميل المباشر.</p>
-                                <a href="${d.url}" target="_blank" class="w-full py-4 bg-cyan-700 hover:bg-cyan-800 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/10">
+                                <h3 class="text-xl font-black text-gray-900 mb-1">${d.name}</h3>
+                                <p class="text-xs font-bold text-cyan-600 bg-cyan-50 px-3 py-1 rounded-full mb-3">مرات التحميل: ${d.downloads || 0}</p>
+                                <p class="text-gray-400 text-sm leading-relaxed mb-6">تطبيق حصري وآمن، متاح الآن للتحميل المباشر.</p>
+                                <button onclick="processDownload('${appId}', '${d.url}')" class="w-full py-4 bg-cyan-700 hover:bg-cyan-800 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/10">
                                     <span class="material-symbols-rounded text-xl">download</span>
                                     تحميل الآن
-                                </a>
+                                </button>
                             </div>`;
                     });
                 }
