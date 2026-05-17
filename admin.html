@@ -174,7 +174,7 @@
             
             <!-- Dashboard Tab -->
             <div id="content-dashboard">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                     <div>
                         <h1 class="text-3xl font-black text-white mb-2">أهلاً بك، <span id="adminDisplayName">أيها الآدمن</span> 👋</h1>
                         <p class="text-slate-400 font-medium">إليك نظرة سريعة على ما يحدث في منصتك اليوم.</p>
@@ -184,6 +184,39 @@
                         <div class="text-right">
                             <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">الوقت الحالي</p>
                             <p id="currentTime" class="text-lg font-bold text-[#64ffda] tabular-nums">00:00:00</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                    <div class="glass-card p-6 rounded-[2rem] flex items-center gap-6 border-r-4 border-emerald-400">
+                        <div class="w-14 h-14 bg-emerald-400/10 rounded-2xl flex items-center justify-center text-emerald-400">
+                            <span class="material-symbols-rounded text-3xl">visibility</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-slate-400 mb-1">إجمالي الزيارات</p>
+                            <p id="totalVisitors" class="text-3xl font-black text-white">0</p>
+                        </div>
+                    </div>
+
+                    <div class="glass-card p-6 rounded-[2rem] flex items-center gap-6 border-r-4 border-blue-400">
+                        <div class="w-14 h-14 bg-blue-400/10 rounded-2xl flex items-center justify-center text-blue-400">
+                            <span class="material-symbols-rounded text-3xl">download</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-slate-400 mb-1">إجمالي التحميلات</p>
+                            <p id="totalDownloads" class="text-3xl font-black text-white">0</p>
+                        </div>
+                    </div>
+
+                    <div class="glass-card p-6 rounded-[2rem] flex items-center gap-6 border-r-4 border-purple-400">
+                        <div class="w-14 h-14 bg-purple-400/10 rounded-2xl flex items-center justify-center text-purple-400">
+                            <span class="material-symbols-rounded text-3xl">apps</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-slate-400 mb-1">عدد التطبيقات</p>
+                            <p id="totalAppsCount" class="text-3xl font-black text-white">0</p>
                         </div>
                     </div>
                 </div>
@@ -233,10 +266,19 @@
                             </div>
                         </div>
                         <div class="glass-card p-8 rounded-[2.5rem]">
-                            <h3 class="text-lg font-black text-white mb-6">قائمة التطبيقات</h3>
-                            <table class="w-full text-right">
-                                <tbody id="appsTable"></tbody>
-                            </table>
+                            <h3 class="text-lg font-black text-white mb-6">إحصائيات التطبيقات</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-right whitespace-nowrap">
+                                    <thead class="text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-white/5">
+                                        <tr>
+                                            <th class="pb-4 pr-4">التطبيق</th>
+                                            <th class="pb-4 text-center">التحميلات</th>
+                                            <th class="pb-4 pl-4 text-left">إجراء</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="appsTable"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </section>
                 </div>
@@ -267,7 +309,7 @@
                     <div class="glass-card p-8 rounded-[2.5rem]">
                         <h3 class="text-lg font-black text-white mb-6">قائمة المشرفين</h3>
                         <table class="w-full text-right">
-                            <thead class="text-slate-500 text-xs font-bold uppercase tracking-widest">
+                            <thead class="text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-white/5">
                                 <tr>
                                     <th class="pb-4 pr-4">الاسم</th>
                                     <th class="pb-4 pr-4">البريد</th>
@@ -287,7 +329,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy, setDoc, getDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAZmSTHnXQBHllQ8_dGI72Li4EC775TldI",
@@ -393,10 +435,13 @@
             const url = document.getElementById('appUrl').value;
             const icon = document.getElementById('appIcon').value;
             if(!name || !url) return;
+            
+            // Add downloads field with default 0
             await addDoc(collection(db, "apps"), { 
                 name, 
                 url, 
-                icon: icon || '', // Icon is optional
+                icon: icon || '', 
+                downloads: 0,
                 timestamp: serverTimestamp() 
             });
             Swal.fire('تمت الإضافة', 'تمت إضافة التطبيق بنجاح', 'success');
@@ -415,6 +460,18 @@
         };
 
         async function loadData() {
+            // General Stats
+            try {
+                const statsDoc = await getDoc(doc(db, "stats", "general"));
+                if (statsDoc.exists()) {
+                    document.getElementById('totalVisitors').innerText = statsDoc.data().visitors || 0;
+                    document.getElementById('totalDownloads').innerText = statsDoc.data().total_downloads || 0;
+                } else {
+                    // Create stats doc if it doesn't exist
+                    await setDoc(doc(db, "stats", "general"), { visitors: 0, total_downloads: 0 });
+                }
+            } catch (e) { console.error("Error loading stats", e); }
+
             // News
             const qN = query(collection(db, "announcements"), orderBy("timestamp", "desc"));
             const sN = await getDocs(qN);
@@ -423,11 +480,23 @@
             });
             document.getElementById('newsTable').innerHTML = nH;
 
-            // Apps
+            // Apps & App Stats
             const qA = query(collection(db, "apps"), orderBy("timestamp", "desc"));
             const sA = await getDocs(qA);
+            document.getElementById('totalAppsCount').innerText = sA.size; // Update total apps count
+            
             let aH = ""; sA.forEach(d => {
-                aH += `<tr class="data-row"><td class="py-4 pr-4 font-bold text-slate-200">${d.data().name}</td><td class="py-4 pl-4 text-left"><button onclick="deleteItem('apps','${d.id}')" class="text-red-400"><span class="material-symbols-rounded">delete</span></button></td></tr>`;
+                const data = d.data();
+                aH += `
+                <tr class="data-row">
+                    <td class="py-4 pr-4 font-bold text-slate-200">${data.name}</td>
+                    <td class="py-4 text-center font-black text-[#64ffda]">${data.downloads || 0}</td>
+                    <td class="py-4 pl-4 text-left">
+                        <button onclick="deleteItem('apps','${d.id}')" class="text-red-400 hover:text-red-300 transition-colors">
+                            <span class="material-symbols-rounded">delete</span>
+                        </button>
+                    </td>
+                </tr>`;
             });
             document.getElementById('appsTable').innerHTML = aH;
 
