@@ -127,6 +127,37 @@
         </div>
     </div>
 
+    <!-- Edit App Modal -->
+    <div id="editAppModal" class="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-6 transition-all duration-300">
+        <div class="glass-card w-full max-w-lg p-8 rounded-[2.5rem] animate-fade-in">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-2xl font-black text-white">تعديل التطبيق</h2>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <span class="material-symbols-rounded">close</span>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <input type="hidden" id="editAppId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-2 mr-2">اسم التطبيق</label>
+                    <input type="text" id="editAppName" class="input-modern w-full p-4 rounded-2xl outline-none text-white font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-2 mr-2">رابط التحميل</label>
+                    <input type="text" id="editAppUrl" class="input-modern w-full p-4 rounded-2xl outline-none text-white font-medium">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-2 mr-2">رابط الأيقونة (اختياري)</label>
+                    <input type="text" id="editAppIcon" class="input-modern w-full p-4 rounded-2xl outline-none text-white font-medium">
+                </div>
+                
+                <button onclick="saveAppChanges()" class="btn-flutter w-full mt-6 py-4 rounded-2xl font-black flex items-center justify-center gap-3">
+                    <span class="material-symbols-rounded">save</span> حفظ التعديلات
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Sidebar -->
     <aside id="sidebar" class="hidden lg:flex w-80 bg-[#0f172a]/80 backdrop-blur-xl border-l border-white/5 flex-col p-8 fixed h-full z-50">
         <div class="mb-12">
@@ -259,7 +290,7 @@
                             <div class="space-y-4">
                                 <input type="text" id="appName" class="input-modern w-full p-4 rounded-2xl outline-none text-white font-bold" placeholder="اسم التطبيق أو اللعبة">
                                 <input type="text" id="appUrl" class="input-modern w-full p-4 rounded-2xl outline-none text-white font-medium" placeholder="رابط التحميل المباشر">
-                                <input type="text" id="appIcon" class="input-modern w-full p-4 rounded-2xl outline-none text-white font-medium" placeholder="رابط أيقونة التطبيق (ImgBB / PostImages)">
+                                <input type="text" id="appIcon" class="input-modern w-full p-4 rounded-2xl outline-none text-white font-medium" placeholder="رابط أيقونة التطبيق (اختياري)">
                                 <button onclick="publishApp()" class="btn-flutter w-full py-4 rounded-2xl font-black flex items-center justify-center gap-3">
                                     <span class="material-symbols-rounded">verified</span> إضافة للمتجر
                                 </button>
@@ -273,7 +304,7 @@
                                         <tr>
                                             <th class="pb-4 pr-4">التطبيق</th>
                                             <th class="pb-4 text-center">التحميلات</th>
-                                            <th class="pb-4 pl-4 text-left">إجراء</th>
+                                            <th class="pb-4 pl-4 text-center">إجراءات</th>
                                         </tr>
                                     </thead>
                                     <tbody id="appsTable"></tbody>
@@ -436,7 +467,6 @@
             const icon = document.getElementById('appIcon').value;
             if(!name || !url) return;
             
-            // Add downloads field with default 0
             await addDoc(collection(db, "apps"), { 
                 name, 
                 url, 
@@ -452,10 +482,49 @@
         };
 
         window.deleteItem = async (col, id) => {
-            const res = await Swal.fire({ title: 'تأكيد الحذف', icon: 'warning', showCancelButton: true });
+            const res = await Swal.fire({ title: 'تأكيد الحذف', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' });
             if(res.isConfirmed) {
                 await deleteDoc(doc(db, col, id));
                 loadData();
+            }
+        };
+
+        // Edit App Functions
+        window.openEditModal = (id, name, url, icon) => {
+            document.getElementById('editAppId').value = id;
+            document.getElementById('editAppName').value = name;
+            document.getElementById('editAppUrl').value = url;
+            document.getElementById('editAppIcon').value = icon !== 'undefined' ? icon : '';
+            document.getElementById('editAppModal').classList.remove('hidden');
+        };
+
+        window.closeEditModal = () => {
+            document.getElementById('editAppModal').classList.add('hidden');
+        };
+
+        window.saveAppChanges = async () => {
+            const id = document.getElementById('editAppId').value;
+            const name = document.getElementById('editAppName').value;
+            const url = document.getElementById('editAppUrl').value;
+            const icon = document.getElementById('editAppIcon').value;
+
+            if(!name || !url) {
+                Swal.fire('تنبيه', 'يجب إدخال اسم التطبيق والرابط', 'warning');
+                return;
+            }
+
+            try {
+                Swal.showLoading();
+                await updateDoc(doc(db, "apps", id), {
+                    name: name,
+                    url: url,
+                    icon: icon
+                });
+                Swal.fire({ icon: 'success', title: 'تم التعديل بنجاح', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+                closeEditModal();
+                loadData();
+            } catch (error) {
+                Swal.fire('خطأ', 'حدث خطأ أثناء حفظ التعديلات', 'error');
             }
         };
 
@@ -467,7 +536,6 @@
                     document.getElementById('totalVisitors').innerText = statsDoc.data().visitors || 0;
                     document.getElementById('totalDownloads').innerText = statsDoc.data().total_downloads || 0;
                 } else {
-                    // Create stats doc if it doesn't exist
                     await setDoc(doc(db, "stats", "general"), { visitors: 0, total_downloads: 0 });
                 }
             } catch (e) { console.error("Error loading stats", e); }
@@ -476,25 +544,35 @@
             const qN = query(collection(db, "announcements"), orderBy("timestamp", "desc"));
             const sN = await getDocs(qN);
             let nH = ""; sN.forEach(d => {
-                nH += `<tr class="data-row"><td class="py-4 pr-4 font-bold text-slate-200">${d.data().title}</td><td class="py-4 pl-4 text-left"><button onclick="deleteItem('announcements','${d.id}')" class="text-red-400"><span class="material-symbols-rounded">delete</span></button></td></tr>`;
+                nH += `<tr class="data-row"><td class="py-4 pr-4 font-bold text-slate-200">${d.data().title}</td><td class="py-4 pl-4 text-left"><button onclick="deleteItem('announcements','${d.id}')" class="text-red-400 hover:text-red-300"><span class="material-symbols-rounded">delete</span></button></td></tr>`;
             });
             document.getElementById('newsTable').innerHTML = nH;
 
             // Apps & App Stats
             const qA = query(collection(db, "apps"), orderBy("timestamp", "desc"));
             const sA = await getDocs(qA);
-            document.getElementById('totalAppsCount').innerText = sA.size; // Update total apps count
+            document.getElementById('totalAppsCount').innerText = sA.size;
             
             let aH = ""; sA.forEach(d => {
                 const data = d.data();
+                // Escape quotes to prevent breaking the onclick function
+                const safeName = (data.name || '').replace(/'/g, "\\'");
+                const safeUrl = (data.url || '').replace(/'/g, "\\'");
+                const safeIcon = (data.icon || '').replace(/'/g, "\\'");
+
                 aH += `
                 <tr class="data-row">
-                    <td class="py-4 pr-4 font-bold text-slate-200">${data.name}</td>
+                    <td class="py-4 pr-4 font-bold text-slate-200 truncate max-w-[150px]">${data.name}</td>
                     <td class="py-4 text-center font-black text-[#64ffda]">${data.downloads || 0}</td>
-                    <td class="py-4 pl-4 text-left">
-                        <button onclick="deleteItem('apps','${d.id}')" class="text-red-400 hover:text-red-300 transition-colors">
-                            <span class="material-symbols-rounded">delete</span>
-                        </button>
+                    <td class="py-4 pl-4 text-center">
+                        <div class="flex items-center justify-center gap-3">
+                            <button onclick="openEditModal('${d.id}', '${safeName}', '${safeUrl}', '${safeIcon}')" class="text-blue-400 hover:text-blue-300 transition-colors" title="تعديل">
+                                <span class="material-symbols-rounded">edit_square</span>
+                            </button>
+                            <button onclick="deleteItem('apps','${d.id}')" class="text-red-400 hover:text-red-300 transition-colors" title="حذف">
+                                <span class="material-symbols-rounded">delete</span>
+                            </button>
+                        </div>
                     </td>
                 </tr>`;
             });
